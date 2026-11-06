@@ -1,5 +1,25 @@
 # ARCHER
 
+## Active production pipeline
+
+Source understanding now includes frozen offline Cargo workspace metadata, dependency aliases, and public module/type/function re-exports. Reports add exact handler-definition provenance and separate evidence/confidence/abstention records for membership, invariants, and drift. See `research/README.md` for current development evaluation and reserved final-evaluation cases. No drift support thresholds were relaxed.
+
+`src/main.rs` calls `analyzer::analyze_repository`. The production flow is:
+
+1. **Discover routes** (`analyzer.rs`): parse Rust files, index handlers, and resolve registrations across files.
+2. **Recover mount context** (`analyzer/registration.rs`): expand configuration callbacks, apply scope/application context, and merge duplicate observations.
+3. **Assess evidence** (`analyzer/security.rs`): record authentication, roles, permissions and ownership, distinguishing observed enforcement from uncertain checks. These assessments do not determine peer membership.
+4. **Form peer groups** (`policy_drift::discover` then `policy_drift::families`): use internal resource relationships to create explicit, explainable groups. Candidate relationships are internal discovery evidence.
+5. **Infer invariants and detect drift** (`policy_drift::infer`): collect policy support, check overlapping proposals, then compare each eligible target with its other peers. An authorization contract is the reported `AuthorizationInvariant`, not a second grouping system.
+6. **Report evidence**: `main.rs` renders the existing CLI/JSON; `analyzer/reporting.rs` builds graphs and selects change-aware results using the existing behavior.
+
+For example, GET, PUT and DELETE `/documents/{id}` can form a resource peer group independent of their security checks. If GET and PUT enforce a verified `documents.manage` permission, they support an invariant. DELETE can produce a potential drift finding if its behavior is known and it lacks that requirement. Uncertain enforcement abstains. Two agreeing members can establish an invariant, while a drift comparison still requires two OTHER supporters. All existing thresholds and rules are unchanged by the maintenance refactor.
+
+`analyzer/legacy.rs` retains the earlier prototype only under `cfg(test)`; production never calls it. Existing unit tests live in `analyzer/tests.rs`, `policy_drift_tests.rs` and `registration_security_tests.rs`. Shared policy bookkeeping stays in small private helpers inside `policy_drift.rs`; discovery and handler resolution remain together to avoid unnecessary module boundaries. `comparison_key` is shared by overlap/coverage bookkeeping, while source-registration and mounted-route identities retain their distinct existing semantics.
+
+Evaluation tools and labels live in `research/`. Downloaded repositories, frozen binaries and historical reports under `target/peer-evaluation/` are research inputs/evidence, not ARCHER source. Do not clear that directory as ordinary build cache. New refactor comparisons live separately under `target/refactor-verification/`; frozen Lemmy evidence is not regenerated. Evaluation metrics use `null` when observations are unavailable and zero only when a measurement supports zero.
+
+
 **Repository-Aware Authorization Consistency & Drift Detection Framework**
 
 ARCHER is a deterministic, AST-based static analysis security framework designed to detect **authorization drift** in web applications (starting with Rust and Actix-Web). Rather than relying exclusively on hand-written static rules or treating endpoints in isolation, ARCHER infers **repository-local authorization contracts** across structurally and contextually related routes and flags deviations with complete source provenance.

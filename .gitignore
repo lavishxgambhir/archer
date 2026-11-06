@@ -1,1 +1,4 @@
 /target/
+
+# Python evaluation bytecode
+__pycache__/

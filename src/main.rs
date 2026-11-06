@@ -177,6 +177,15 @@ fn main() -> Result<()> {
     println!("ARCHER Authorization Analysis Report");
     println!("============================================================");
     println!("Repository Scanned : {}", cli.path.display());
+    for diagnostic in &report.diagnostics {
+        println!(
+            "Diagnostic [{}] {}:{}: {}",
+            diagnostic.code,
+            diagnostic.file.display(),
+            diagnostic.line,
+            diagnostic.message
+        );
+    }
     println!("Rust Files Scanned : {}", report.files_scanned);
     if !report.parse_errors.is_empty() {
         println!("Rust Files Skipped : {}", report.parse_errors.len());
@@ -196,11 +205,44 @@ fn main() -> Result<()> {
             "Analysis Layers    : {} Peer Groups, {} Inferred Invariants",
             summary.peer_groups_count, summary.inferred_invariants_count
         );
+        println!(
+            "Group Coverage     : {}/{} routes",
+            summary.peer_group_covered_routes, summary.total_routes
+        );
+        println!("Drift Findings     : {}", summary.drift_findings_count);
+        println!(
+            "Peer Coverage      : {}/{} routes compared; {} without peer comparison",
+            summary.peer_compared_routes,
+            summary.total_routes,
+            summary.routes_without_peer_comparison
+        );
     } else {
         println!("Route candidates   : {}", report.routes.len());
     }
     println!("------------------------------------------------------------");
 
+    for group in &report.peer_groups {
+        println!("Peer Group {}: {} routes", group.id, group.routes.len());
+        println!("  Evidence: {}", group.description);
+        for item in report
+            .analysis_evidence
+            .iter()
+            .filter(|e| e.peer_group_id == group.id && e.stage != "drift")
+        {
+            println!(
+                "  {} {} confidence: {}",
+                item.stage,
+                item.dimension.as_deref().unwrap_or(""),
+                item.confidence
+            );
+            for reason in &item.abstention_reasons {
+                println!("    Limit: {}", reason);
+            }
+        }
+        for route in &group.routes {
+            println!("  {} {}", route.method, route.path);
+        }
+    }
     for route in &report.routes {
         println!("{} {}", route.method, route.path);
         println!("  status: {:?}", route.security_status());
